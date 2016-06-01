@@ -1,0 +1,6 @@
+server = Server.start
+c1 = Client.start
+c2 = Client.start
+send server, {c1, :connect, "Martin"}
+send server, {c2, :connect, "Ale"}
+send server, {c1,c2,:escribir,"hola soy c1"}
