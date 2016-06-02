@@ -21,8 +21,16 @@ defmodule Server do
           clients = List.delete(clients, nil)          
           IO.puts 'Se desconecto usuario con PID: #{inspect client}.'                   
           loop(clients)
-      {emisor, receptor, :visto} -> 
-	      	send emisor, {receptor, :visto}       		
+      {receptor, :visto, emisor} -> 
+          em_map = Enum.find clients, fn x ->
+            Map.get(x,:pid) == emisor
+          end
+          silent = Map.get(em_map, :silent)
+          rec_map = Enum.find(silent, fn(x) -> x == receptor end)
+          case (rec_map == nil) do          
+	      	  true -> send emisor, {receptor, :visto}       		
+            false -> 'nothing'
+          end
       {:getClients} -> 
           IO.puts 'Clients: #{inspect clients}' 
       {emisor, receptor, :escribir, mensaje} -> 
@@ -32,11 +40,29 @@ defmodule Server do
 	      	:timer.sleep(3* 1000);	 
 	      	send receptor, {self, emisor, :leer, mensaje}              	
       {emisor, :silent, receptor} ->    
-          e = Enum.filter clients, fn x ->
+          em_map = Enum.filter clients, fn x ->
             Map.get(x,:pid) == emisor
           end
-          e = List.first(e)
+          rest_list = Enum.filter clients, fn x ->
+            Map.get(x,:pid) != emisor
+          end                    
+          em_map = Map.put(List.first(em_map),
+                            :silent, 
+                            List.flatten(Map.get(List.first(em_map),:silent),[receptor]))
+          clients = List.insert_at(rest_list, -1, em_map)
+          loop(clients)                            
+      {emisor, :unsilent, receptor} ->    
+          em_map = List.first(Enum.filter clients, fn x ->
+                                Map.get(x,:pid) == emisor
+                              end)
+          rest_list = Enum.filter clients, fn x ->
+            Map.get(x,:pid) != emisor
+          end    
 
+          silent = List.delete(Map.get(em_map,:silent), receptor)
+          em_map = Map.put(em_map, :silent, silent)
+          clients = List.insert_at(rest_list, -1, em_map)
+          loop(clients)           
     end
     loop(clients)
   end
@@ -52,11 +78,9 @@ defmodule Client do
     receive do
 		{server, emisor, :leer, mensaje} -> 
 			IO.puts 'Se lee mensaje: #{mensaje} de emisor: #{inspect emisor}'
-			send server, {emisor, self, :visto}
+			send server, {self, :visto, emisor}
 		{emisor, :typing} -> 
 			IO.puts 'Usuario #{inspect emisor} esta escribiendo...'			
-    {emisor, :typing} -> 
-      IO.puts 'Usuario #{inspect emisor} esta escribiendo...'           
 		{receptor, :visto} ->
 			IO.puts 'Visto por #{inspect receptor}' 
     end  
