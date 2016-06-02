@@ -7,9 +7,42 @@ defmodule Server do
     spawn(fn -> loop(clients) end)
   end
 
+  def getClient(clients, client) do
+    Enum.find clients, fn x ->
+      Map.get(x,:pid) == client
+    end    
+  end
+
+  def filterClient(clients, client) do
+    Enum.filter clients, fn x ->
+      Map.get(x,:pid) != client
+    end    
+  end
+
+  def addSilent(user, element) do
+    List.flatten(Map.get(user,:silent),[element])
+  end
+
+  def removeSilent(user, element) do
+    List.delete(Map.get(user,:silent),element)
+  end
+
+  def updateSilent(user, new_silent) do
+    Map.put(user, :silent, new_silent)
+  end
+
+  def isSilenced(user, element) do
+    silent = Map.get(user, :silent)
+    if (Enum.member?(silent, element)) do          
+      true
+    else
+      false
+    end    
+  end
+
   def loop(clients) do
     receive do
-      {client, :connect, nickname} ->
+      {client, :connect, nickname} ->          
           user = %User{nickname: nickname, pid: client}
           clients = List.insert_at(clients, -1, user) 
       		IO.puts 'Se conecto usuario: #{nickname}. Proceso #{inspect client}'         
@@ -22,17 +55,12 @@ defmodule Server do
           IO.puts 'Se desconecto usuario con PID: #{inspect client}.'                   
           loop(clients)
       {receptor, :visto, emisor} -> 
-          em_map = Enum.find clients, fn x ->
-            Map.get(x,:pid) == emisor
+          em_map = getClient(clients, emisor)        
+          if (!isSilenced(em_map, receptor)) do
+	      	  send emisor, {receptor, :visto}       		          
           end
-          silent = Map.get(em_map, :silent)
-          rec_map = Enum.find(silent, fn(x) -> x == receptor end)
-          case (rec_map == nil) do          
-	      	  true -> send emisor, {receptor, :visto}       		
-            false -> 'nothing'
-          end
-      {:getClients} -> 
-          IO.puts 'Clients: #{inspect clients}' 
+      {:print, :clients} -> 
+          IO.puts 'Clients: #{inspect clients}'           
       {emisor, receptor, :escribir, mensaje} -> 
 	      	IO.puts 'Escribe mensaje. Emisor #{inspect emisor} Receptor #{inspect receptor}. 
 	      			 Mensaje: #{mensaje}'
@@ -40,28 +68,18 @@ defmodule Server do
 	      	:timer.sleep(3* 1000);	 
 	      	send receptor, {self, emisor, :leer, mensaje}              	
       {emisor, :silent, receptor} ->    
-          em_map = Enum.filter clients, fn x ->
-            Map.get(x,:pid) == emisor
-          end
-          rest_list = Enum.filter clients, fn x ->
-            Map.get(x,:pid) != emisor
-          end                    
-          em_map = Map.put(List.first(em_map),
-                            :silent, 
-                            List.flatten(Map.get(List.first(em_map),:silent),[receptor]))
-          clients = List.insert_at(rest_list, -1, em_map)
+          em_map = getClient(clients, emisor)
+          rest_list = filterClient(clients, emisor)
+          clients = List.insert_at(rest_list, -1, 
+                                    updateSilent(em_map, 
+                                    addSilent(em_map, receptor)))
           loop(clients)                            
-      {emisor, :unsilent, receptor} ->    
-          em_map = List.first(Enum.filter clients, fn x ->
-                                Map.get(x,:pid) == emisor
-                              end)
-          rest_list = Enum.filter clients, fn x ->
-            Map.get(x,:pid) != emisor
-          end    
-
-          silent = List.delete(Map.get(em_map,:silent), receptor)
-          em_map = Map.put(em_map, :silent, silent)
-          clients = List.insert_at(rest_list, -1, em_map)
+      {emisor, :unsilent, receptor} ->  
+          em_map = getClient(clients, emisor)  
+          rest_list = filterClient(clients, emisor)
+          clients = List.insert_at(rest_list, -1, 
+                                    updateSilent(em_map, 
+                                    removeSilent(em_map, receptor)))
           loop(clients)           
     end
     loop(clients)
