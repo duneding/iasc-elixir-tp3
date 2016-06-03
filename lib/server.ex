@@ -88,14 +88,14 @@ defmodule Server do
           em_map = getClient(clients,emisor)
           silents = getSilents(em_map)
           Enum.each clients, fn x -> 
-            if (hasPid(x,emisor) && !isSilenced(em_map,x)) do
+            if (!hasPid(x,emisor) && !isSilenced(em_map,x)) do
               receptor = getPid(x)
               send receptor, {emisor, :typing}    
             end
           end  
           :timer.sleep(3* 1000);   
           Enum.each clients, fn x -> 
-            if (hasPid(x,emisor) && !isSilenced(em_map,x)) do
+            if (!hasPid(x,emisor) && !isSilenced(em_map,x)) do
               receptor = getPid(x)
               send receptor, {self, emisor, :leer, mensaje}
             end
