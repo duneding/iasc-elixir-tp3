@@ -60,7 +60,7 @@ defmodule Server do
 	      	  send emisor, {receptor, :visto}       		          
           end
       {:print, :clients} -> 
-          IO.puts 'Clients: #{inspect clients}'           
+          IO.puts 'Clients: #{inspect clients}'
       {emisor, receptor, :escribir, mensaje} -> 
 	      	IO.puts 'Escribe mensaje. Emisor #{inspect emisor} Receptor #{inspect receptor}. 
 	      			 Mensaje: #{mensaje}'
