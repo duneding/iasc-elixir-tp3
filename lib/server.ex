@@ -13,6 +13,22 @@ defmodule Server do
     end    
   end
 
+  def getSilents(user) do
+    Map.get(user,:silent)
+  end
+
+  def getPid(user) do
+    Map.get(user,:pid)
+  end
+  
+  def hasPid(user, pid) do
+    if (Map.get(user,:pid) == pid) do
+      true
+    else
+      false
+    end
+  end
+
   def filterClient(clients, client) do
     Enum.filter clients, fn x ->
       Map.get(x,:pid) != client
@@ -67,6 +83,23 @@ defmodule Server do
 	      	send receptor, {emisor, :typing}	
 	      	:timer.sleep(3* 1000);	 
 	      	send receptor, {self, emisor, :leer, mensaje}              	
+      {emisor, :broadcast, mensaje} -> 
+          IO.puts 'Escribe broadcast. Emisor #{inspect emisor}. Mensaje: #{mensaje}'
+          em_map = getClient(clients,emisor)
+          silents = getSilents(em_map)
+          Enum.each clients, fn x -> 
+            if (hasPid(x,emisor) && !isSilenced(em_map,x)) do
+              receptor = getPid(x)
+              send receptor, {emisor, :typing}    
+            end
+          end  
+          :timer.sleep(3* 1000);   
+          Enum.each clients, fn x -> 
+            if (hasPid(x,emisor) && !isSilenced(em_map,x)) do
+              receptor = getPid(x)
+              send receptor, {self, emisor, :leer, mensaje}
+            end
+          end          
       {emisor, :silent, receptor} ->    
           em_map = getClient(clients, emisor)
           rest_list = filterClient(clients, emisor)
